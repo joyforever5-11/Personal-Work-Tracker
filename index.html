@@ -1,0 +1,259 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Work Tracker — Sunesis DLP</title>
+<style>
+  :root {
+    box-sizing: border-box;
+    --ink: #1f2420; --paper: #f6f3ec; --card: #ffffff; --line: #dcd5c4;
+    --accent: #5c6e4c; --accent-soft: #e8ecdf; --amber: #a9772f; --red: #a4453a; --muted: #6b6a62;
+  }
+  *, *::before, *::after { box-sizing: inherit; }
+  @media (prefers-color-scheme: dark) {
+    :root { --ink: #ece7da; --paper: #15170f; --card: #1d2017; --line: #343826;
+      --accent: #9db37f; --accent-soft: #273120; --amber: #d6a85e; --red: #d98578; --muted: #a3a192; }
+  }
+  html, body { height: 100%; }
+  body { margin: 0; background: var(--paper); color: var(--ink); font-family: Georgia, 'Times New Roman', serif; line-height: 1.5; }
+  .wrap { max-width: 760px; margin: 0 auto; padding: 28px 20px 60px; }
+  header { margin-bottom: 8px; display: flex; justify-content: space-between; align-items: baseline; gap: 10px; flex-wrap: wrap; }
+  header h1 { font-size: 1.5rem; margin: 0 0 4px; font-weight: 600; }
+  header p { margin: 0; color: var(--muted); font-size: 0.92rem; }
+  .sync-tag { font-size: 0.72rem; color: var(--accent); background: var(--accent-soft); padding: 3px 9px; border-radius: 10px; white-space: nowrap; }
+  .sync-tag.offline { color: var(--red); background: var(--line); }
+  .stats { display: flex; gap: 10px; margin: 20px 0 26px; flex-wrap: wrap; }
+  .stat { flex: 1; min-width: 100px; background: var(--card); border: 1px solid var(--line); border-radius: 4px; padding: 12px 14px; }
+  .stat .n { font-size: 1.5rem; font-weight: 600; }
+  .stat .l { font-size: 0.78rem; color: var(--muted); margin-top: 4px; }
+  form { background: var(--card); border: 1px solid var(--line); border-radius: 6px; padding: 18px; margin-bottom: 26px; }
+  form h2 { font-size: 1rem; margin: 0 0 14px; font-weight: 600; }
+  .row { display: flex; gap: 10px; margin-bottom: 10px; flex-wrap: wrap; }
+  .field { flex: 1; min-width: 140px; display: flex; flex-direction: column; gap: 4px; }
+  label { font-size: 0.78rem; color: var(--muted); }
+  input, select, textarea { font-family: inherit; font-size: 0.95rem; padding: 8px 9px; border: 1px solid var(--line); border-radius: 4px; background: var(--paper); color: var(--ink); }
+  textarea { resize: vertical; min-height: 44px; }
+  button { font-family: inherit; font-size: 0.92rem; background: var(--accent); color: var(--paper); border: none; border-radius: 4px; padding: 10px 18px; cursor: pointer; }
+  button:disabled { opacity: 0.5; }
+  button.ghost { background: transparent; color: var(--accent); border: 1px solid var(--accent); }
+  .filters { display: flex; gap: 8px; margin-bottom: 14px; flex-wrap: wrap; align-items: center; }
+  .filters .spacer { flex: 1; }
+  .item { background: var(--card); border: 1px solid var(--line); border-left: 4px solid var(--accent); border-radius: 4px; padding: 12px 14px; margin-bottom: 10px; }
+  .item.status-done { border-left-color: var(--muted); opacity: 0.72; }
+  .item.status-progress { border-left-color: var(--amber); }
+  .item-top { display: flex; justify-content: space-between; gap: 10px; }
+  .item-top .task { font-weight: 600; }
+  .item.status-done .task { text-decoration: line-through; }
+  .item-meta { font-size: 0.78rem; color: var(--muted); margin-top: 3px; display: flex; gap: 10px; flex-wrap: wrap; }
+  .badge { display: inline-block; padding: 1px 8px; border-radius: 10px; background: var(--accent-soft); color: var(--accent); font-size: 0.72rem; }
+  .item-notes { margin-top: 8px; font-size: 0.9rem; white-space: pre-wrap; }
+  .item-contribution { margin-top: 8px; font-size: 0.9rem; white-space: pre-wrap; background: var(--accent-soft); border-left: 3px solid var(--accent); padding: 8px 10px; border-radius: 3px; }
+  .item-contribution .lbl { font-weight: 600; font-size: 0.72rem; color: var(--accent); text-transform: uppercase; letter-spacing: 0.3px; display: block; margin-bottom: 3px; }
+  .item-actions { margin-top: 10px; display: flex; gap: 8px; }
+  .item-actions button { font-size: 0.8rem; padding: 5px 10px; }
+  .empty { text-align: center; color: var(--muted); padding: 30px 10px; }
+  .banner { font-size: 0.82rem; color: var(--red); background: var(--accent-soft); border-radius: 4px; padding: 8px 12px; margin-bottom: 18px; display: none; }
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div><h1>Work Tracker</h1><p>Praise Omenogor · Associate, Sunesis DLP</p></div>
+    <span class="sync-tag" id="syncTag">Connecting…</span>
+  </header>
+  <div class="banner" id="banner"></div>
+  <div class="stats" id="stats"></div>
+
+  <form id="taskForm">
+    <h2>Log a task</h2>
+    <div class="row">
+      <div class="field"><label for="date">Date</label><input type="date" id="date" required></div>
+      <div class="field"><label for="category">Category</label>
+        <select id="category">
+          <option>Litigation</option><option>Corporate/Commercial</option><option>Client Communication</option>
+          <option>Research &amp; Drafting</option><option>Content/Social Media</option><option>Admin</option><option>Other</option>
+        </select>
+      </div>
+      <div class="field"><label for="status">Status</label>
+        <select id="status"><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Done</option></select>
+      </div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:2 1 260px;"><label for="task">Task</label><input type="text" id="task" placeholder="e.g. Draft Notice of Appeal" required></div>
+      <div class="field"><label for="matter">Matter/Client</label><input type="text" id="matter" placeholder="Optional"></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1 1 100%;"><label for="initiative">What I contributed / initiative taken</label><textarea id="initiative" placeholder="e.g. Caught the extension-of-time issue before it was flagged"></textarea></div>
+    </div>
+    <div class="row">
+      <div class="field" style="flex:1 1 100%;"><label for="notes">Notes</label><textarea id="notes" placeholder="Context, next step..."></textarea></div>
+    </div>
+    <button type="submit" id="submitBtn">Add task</button>
+  </form>
+
+  <div class="filters">
+    <select id="filterCategory"><option value="">All categories</option></select>
+    <select id="filterStatus"><option value="">All statuses</option><option value="todo">To do</option><option value="progress">In progress</option><option value="done">Done</option></select>
+    <div class="spacer"></div>
+    <button class="ghost" id="clearAll" type="button">Clear all</button>
+  </div>
+
+  <div id="list"><div class="empty">Loading…</div></div>
+</div>
+
+<script>
+// ======== SET THIS to your Apps Script Web App URL (see setup instructions) ========
+const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyuOIHChfwLhBtSFxJ0FDgbSmb2xBPGJPi05NBLu1uluPETG1WMgHBk06Zue4huamsE/exec";
+// =====================================================================================
+
+const categories = ["Litigation","Corporate/Commercial","Client Communication","Research & Drafting","Content/Social Media","Admin","Other"];
+document.getElementById('filterCategory').innerHTML += categories.map(c => `<option value="${c}">${c}</option>`).join('');
+
+let tasks = [];
+
+function setBanner(msg) {
+  const b = document.getElementById('banner');
+  if (!msg) { b.style.display = 'none'; return; }
+  b.textContent = msg; b.style.display = 'block';
+}
+function setSyncTag(text, offline) {
+  const t = document.getElementById('syncTag');
+  t.textContent = text; t.classList.toggle('offline', !!offline);
+}
+function fmtDate(d) {
+  if (!d) return '';
+  const dt = new Date(d + 'T00:00:00');
+  return dt.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function statusLabel(s) { return s === 'todo' ? 'To do' : s === 'progress' ? 'In progress' : 'Done'; }
+function escapeHtml(str) { const d = document.createElement('div'); d.textContent = str || ''; return d.innerHTML; }
+
+async function apiGet() {
+  const res = await fetch(SCRIPT_URL, { method: 'GET' });
+  const json = await res.json();
+  return json.tasks || [];
+}
+async function apiPost(payload) {
+  const res = await fetch(SCRIPT_URL, {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+    body: JSON.stringify(payload)
+  });
+  return res.json();
+}
+
+async function refresh() {
+  try {
+    tasks = await apiGet();
+    setSyncTag('Synced to your Google Sheet');
+    render();
+  } catch (e) {
+    setSyncTag('Connection issue', true);
+    setBanner('Could not reach the backend. Check SCRIPT_URL and your connection.');
+  }
+}
+
+function render() {
+  const fc = document.getElementById('filterCategory').value;
+  const fs = document.getElementById('filterStatus').value;
+  const list = document.getElementById('list');
+  list.innerHTML = '';
+
+  const filtered = tasks
+    .filter(t => !fc || t.Category === fc)
+    .filter(t => !fs || t.Status === fs)
+    .slice()
+    .sort((a,b) => (b.Date||'').localeCompare(a.Date||''));
+
+  if (filtered.length === 0) {
+    list.innerHTML = '<div class="empty">No tasks logged yet.</div>';
+  } else {
+    filtered.forEach(t => {
+      const el = document.createElement('div');
+      el.className = 'item status-' + t.Status;
+      el.innerHTML = `
+        <div class="item-top"><span class="task">${escapeHtml(t.Task)}</span><span class="badge">${escapeHtml(t.Category)}</span></div>
+        <div class="item-meta"><span>${fmtDate(t.Date)}</span>${t.Matter ? '<span>'+escapeHtml(t.Matter)+'</span>' : ''}<span>${statusLabel(t.Status)}</span></div>
+        ${t.Initiative ? '<div class="item-contribution"><span class="lbl">Initiative</span>'+escapeHtml(t.Initiative)+'</div>' : ''}
+        ${t.Notes ? '<div class="item-notes">'+escapeHtml(t.Notes)+'</div>' : ''}
+        <div class="item-actions">
+          ${t.Status !== 'done' ? '<button data-action="advance" data-id="'+t.ID+'">'+(t.Status==='todo'?'Start':'Mark done')+'</button>' : ''}
+          <button class="ghost" data-action="delete" data-id="${t.ID}">Remove</button>
+        </div>`;
+      list.appendChild(el);
+    });
+  }
+
+  const total = tasks.length;
+  const done = tasks.filter(t => t.Status === 'done').length;
+  const progress = tasks.filter(t => t.Status === 'progress').length;
+  const todo = tasks.filter(t => t.Status === 'todo').length;
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="n">${total}</div><div class="l">Total logged</div></div>
+    <div class="stat"><div class="n">${todo}</div><div class="l">To do</div></div>
+    <div class="stat"><div class="n">${progress}</div><div class="l">In progress</div></div>
+    <div class="stat"><div class="n">${done}</div><div class="l">Done</div></div>`;
+}
+
+document.getElementById('taskForm').addEventListener('submit', async function(e) {
+  e.preventDefault();
+  const task = document.getElementById('task').value.trim();
+  if (!task) return;
+  const btn = document.getElementById('submitBtn');
+  btn.disabled = true;
+  try {
+    await apiPost({
+      action: 'add',
+      date: document.getElementById('date').value || new Date().toISOString().slice(0,10),
+      category: document.getElementById('category').value,
+      status: document.getElementById('status').value,
+      task: task,
+      initiative: document.getElementById('initiative').value.trim(),
+      matter: document.getElementById('matter').value.trim(),
+      notes: document.getElementById('notes').value.trim()
+    });
+    e.target.reset();
+    document.getElementById('date').value = new Date().toISOString().slice(0,10);
+    await refresh();
+  } catch (err) {
+    setBanner('Could not save — try again.');
+  } finally {
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('list').addEventListener('click', async function(e) {
+  const btn = e.target.closest('button[data-action]');
+  if (!btn) return;
+  const id = btn.dataset.id;
+  btn.disabled = true;
+  try {
+    if (btn.dataset.action === 'advance') {
+      const t = tasks.find(x => x.ID === id);
+      const nextStatus = t.Status === 'todo' ? 'progress' : 'done';
+      await apiPost({ action: 'update', id: id, status: nextStatus });
+    } else if (btn.dataset.action === 'delete') {
+      await apiPost({ action: 'delete', id: id });
+    }
+    await refresh();
+  } catch (err) {
+    setBanner('Action failed — try again.');
+    btn.disabled = false;
+  }
+});
+
+document.getElementById('filterCategory').addEventListener('change', render);
+document.getElementById('filterStatus').addEventListener('change', render);
+document.getElementById('clearAll').addEventListener('click', async function() {
+  if (confirm('Remove all logged tasks? This cannot be undone.')) {
+    await apiPost({ action: 'clearAll' });
+    await refresh();
+  }
+});
+
+document.getElementById('date').value = new Date().toISOString().slice(0,10);
+refresh();
+</script>
+</body>
+</html>
